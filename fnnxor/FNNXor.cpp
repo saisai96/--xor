@@ -99,7 +99,7 @@ namespace fnnxor
 		XTensor tmp = output - gold;
 		grad = tmp * 2;
 		//tmp.Dump(&tmp, stderr, "tmp: ");
-	}//mselossbackward：因为最后一层只有一个节点，所以loss==(x-y)^2，所以这是特殊的lossbackward
+	}//mselossbackward锛氬洜涓烘渶鍚庝竴灞傚彧鏈変竴涓妭鐐癸紝鎵�浠oss==(x-y)^2锛屾墍浠ヨ繖鏄壒娈婄殑lossbackward
 
 	void Backward(XTensor &input, XTensor &gold, FNNXorModel &model, FNNXorModel &grad, FNNXorNet &net)
 	{
