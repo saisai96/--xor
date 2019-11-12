@@ -13,6 +13,8 @@ namespace fnnxor
 
 		XTensor b;
 
+		XTensor b1;
+
 		int inp_size;
 
 		int h_size;
@@ -29,6 +31,10 @@ namespace fnnxor
 		XTensor hidden_state2;
 
 		XTensor hidden_state3;
+
+		XTensor output_state1;
+
+		XTensor output_state2;
 
 		XTensor output;
 	};
