@@ -4,6 +4,7 @@ namespace fnnxor
 {
 	float learningRate = 0.3F;
 	int nEpoch = 100;
+	int batch = 64;
 	float minmax = 0.01F;
 
 	void Init(FNNXorModel &model);
@@ -21,7 +22,7 @@ namespace fnnxor
 	{
 		FNNXorModel model;
 		model.inp_size = 2;
-		model.h_size = 20;
+		model.h_size = 10;
 		model.oup_size = 8;
 		const int dataSizeL = 64;
 		const int dataSizeD = 2;
@@ -60,9 +61,11 @@ namespace fnnxor
 		InitTensor2D(&model.weight1, model.inp_size, model.h_size, X_FLOAT, model.devID);
 		InitTensor2D(&model.weight2, model.h_size, model.oup_size, X_FLOAT, model.devID);
 		InitTensor2D(&model.b, 1, model.h_size, X_FLOAT, model.devID);
+		InitTensor2D(&model.b1, 1, model.oup_size, X_FLOAT, model.devID);
 		model.weight1.SetDataRand(-minmax, minmax);
 		model.weight2.SetDataRand(-minmax, minmax);
 		model.b.SetZeroAll();
+		model.b1.SetZeroAll();
 		printf("Init model finish!\n");
 	}//init
 
@@ -71,6 +74,7 @@ namespace fnnxor
 		InitTensor(&grad.weight1, &model.weight1);
 		InitTensor(&grad.weight2, &model.weight2);
 		InitTensor(&grad.b, &model.b);
+		InitTensor(&grad.b1, &model.b1);
 
 		grad.inp_size = model.inp_size;
 		grad.h_size = model.h_size;
@@ -82,7 +86,9 @@ namespace fnnxor
 		net.hidden_state1 = MatrixMul(input, model.weight1);
 		net.hidden_state2 = net.hidden_state1 + model.b;
 		net.hidden_state3 = HardTanH(net.hidden_state2);
-		net.output = MatrixMul(net.hidden_state3, model.weight2);
+		net.output_state1 = MatrixMul(net.hidden_state3, model.weight2);
+		net.output_state2 = net.output_state1 + model.b1;
+		net.output = HardTanH(net.output_state2);
 	}//forward
 
 	void MSELoss(XTensor &output, XTensor &gold, XTensor &loss)
@@ -107,17 +113,19 @@ namespace fnnxor
 		XTensor &dedw1 = grad.weight1;
 		XTensor &dedw2 = grad.weight2;
 		XTensor &dedb = grad.b;
+		XTensor &dedb1 = grad.b1;
 
 		MSELossBackward(net.output, gold, lossGrad);
-		MatrixMul(net.hidden_state3, X_TRANS, lossGrad, X_NOTRANS, dedw2);
-		XTensor dedy = MatrixMul(lossGrad, X_NOTRANS, model.weight2, X_TRANS);
+		_HardTanHBackward(&net.output, &net.output_state2, &lossGrad, &dedb1);
+		dedw2 = MatrixMul(net.hidden_state3, X_TRANS, dedb1, X_NOTRANS);
+		XTensor dedy = MatrixMul(dedb1, X_NOTRANS, model.weight2, X_TRANS);
 		_HardTanHBackward(&net.hidden_state3, &net.hidden_state2, &dedy, &dedb);
-		net.hidden_state3.Dump(&net.hidden_state3, stderr, "hidden3: ");
-		net.hidden_state2.Dump(&net.hidden_state2, stderr, "hidden2: ");
-		dedb.Dump(&dedb, stderr, "dedb: ");
-		dedy.Dump(&dedy, stderr, "dedy: ");
+		//net.hidden_state3.Dump(&net.hidden_state3, stderr, "hidden3: ");
+		//net.hidden_state2.Dump(&net.hidden_state2, stderr, "hidden2: ");
+		//dedb.Dump(&dedb, stderr, "dedb: ");
+		//dedy.Dump(&dedy, stderr, "dedy: ");
 		dedw1 = MatrixMul(input, X_TRANS, dedb, X_NOTRANS);
-		dedw1.Dump(&dedw1, stderr, "dedw1: ");
+		//dedw1.Dump(&dedw1, stderr, "dedw1: ");
 	}//backward
 
 	void Update(FNNXorModel &model, FNNXorModel &grad, float learningRate)
@@ -129,6 +137,7 @@ namespace fnnxor
 		model.weight1 = Sum(model.weight1, grad.weight1, -learningRate);
 		model.weight2 = Sum(model.weight2, grad.weight2, -learningRate);
 		model.b = Sum(model.b, grad.b, -learningRate);
+		model.b1 = Sum(model.b1, grad.b1, -learningRate);
 	}//update
 
 	void CleanGrad(FNNXorModel &grad)
@@ -149,7 +158,7 @@ namespace fnnxor
 			XTensor* inputData = NewTensor2D(1, dataSizeD, X_FLOAT, model.devID);
 			for (int j = 0; j < dataSizeD; ++j)
 			{
-				inputData->Set2D(trainDataX[i][j] / 100, 0, j);
+				inputData->Set2D(trainDataX[i][j] / 10, 0, j);
 			}
 			inputList.Add(inputData);
 
@@ -160,7 +169,7 @@ namespace fnnxor
 				//{
 				//	goldData->Set2D(trainDataY[i] / 100, 0, 0);
 				//}
-				goldData->Set2D(trainDataY[i][j] / 60, 0, j);
+				goldData->Set2D(trainDataY[i][j] / 6, 0, j);
 			}
 			goldList.Add(goldData);
 		}//for
@@ -207,18 +216,18 @@ namespace fnnxor
 		{
 			for (int j = 0; j < testDataSizeD; ++j)
 			{
-				inputData->Set2D(testDataX[i][j] / 100, 0, j);
+				inputData->Set2D(testDataX[i][j] / 10, 0, j);
 			}
 			//inputData->Dump(stderr, "testinput: ");
 			Forward(*inputData, model, net);
 			int ans = 0;
-			float temp = net.output.Get2D(0, 0) * 60;
+			float temp = net.output.Get2D(0, 0) * 6;
 			for (int j = 0; j < 8; j++)
 			{
-				//printf("output: %f\n", net.output.Get2D(0, j) * 60);
-				if (temp < (net.output.Get2D(0, j) * 60))
+				printf("output: %f\n", net.output.Get2D(0, j) * 60);
+				if (temp < (net.output.Get2D(0, j) * 6))
 				{
-					temp = net.output.Get2D(0, j) * 60;
+					temp = net.output.Get2D(0, j) * 6;
 					ans = j;
 				}
 			}
