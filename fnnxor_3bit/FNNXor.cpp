@@ -3,7 +3,7 @@
 namespace fnnxor
 {
 	float learningRate = 0.005F;
-	int nEpoch = 500;
+	int nEpoch = 5000;
 	int batch = 64;
 	float minmax = 1.0F;
 
@@ -198,8 +198,8 @@ namespace fnnxor
 		{
 			printf("epoch %d\n", epochIndex);
 			float totalLoss = 0;
-			if ((epochIndex + 1) % 50 == 0)
-				learningRate /= 3;
+			//if ((epochIndex + 1) % 50 == 0)
+			//	learningRate /= 3;
 			for (int i = 0; i < inputList.count; ++i)
 			{
 				XTensor *input = inputList.GetItem(i);
